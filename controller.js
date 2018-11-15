@@ -43,7 +43,7 @@ async.waterfall([
 }
 
 function autoMaodel(req,res){
-    console.log("tyhe body is.....",req.body);
+    console.log("the body is.....",req.body);
     let num1 = req.body.first_no;
     let num2 = req.body.second_no;
 
@@ -60,9 +60,9 @@ function autoMaodel(req,res){
         }] 
     },function(err,result){
         if(err){
-            return res.status(400).send(JSON.stringify(err));
+            return res.status(400).send(err);
         } else {            
-            return res.status(200).send(result );
+            return res.status(200).send(result);
         } 
     })
 }
