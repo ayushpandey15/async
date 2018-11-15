@@ -17,7 +17,6 @@ console.log("the body is.....",req.body);
 let num1 = req.body.first_no;
 let num2 = req.body.second_no;
 
-
 async.waterfall([
     function(cb){
         let c= num1 + num2
