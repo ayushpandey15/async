@@ -6,8 +6,10 @@ function validator(req, res, next) {
     console.log("=======Validating========");
 
     let schema = Joi.object().keys({
-        first_no   : Joi.number().options({convert : false}).required(),
-        second_no  : Joi.number().options({convert : false}).required()
+        first_name : Joi.string().options({convert:false}).required(),
+        last_name  : Joi.string().options({convert:false}).required(),
+        email      : Joi.string().options({convert:false}).required(),
+        password   : Joi.string().options({convert:false}).required() 
     });
 
     var validFields = validateFields( req.body, res, schema);
@@ -16,8 +18,7 @@ function validator(req, res, next) {
     }
 }
 
-function validateFields(req, res, schema) {
-   console.log("the req body is.....",req);
+function validateFields(req, res, schema) { 
     var validation = Joi.validate(req, schema);
     if(validation.error) {
       var errorReason =

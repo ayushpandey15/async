@@ -5,6 +5,7 @@ let bodyParser       = require('body-parser');
 
 let controller       = require('./controller');
 let validator        = require('./validator');
+let mongo            = require('./connection');
 
 app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
 app.use(bodyParser.json({limit: '50mb'}));
@@ -19,6 +20,7 @@ app.get('/eventModel',controller.eventModel);
 let server = require('http').createServer(app);
 let PORT = process.env.PORT || 3000;
 
-server.listen(PORT,()=>{
+server.listen(PORT,()=>{    
     console.log(`the port is listening on.......... ${PORT}`);
+    mongo.start_con();   
 });

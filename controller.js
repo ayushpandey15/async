@@ -1,7 +1,7 @@
 let Promise            = require('bluebird');
 let async              = require('async');
-let readFile           = Promise.promisify(require("fs").readFile);
 const eventEmitter     = require('events');
+let fs                 = require('fs');
 
 let services           = require('./services');
 
@@ -14,104 +14,212 @@ exports.eventModel     = eventModel;
 
 function waterfallModel(req,res){
 console.log("the body is.....",req.body);
-let num1 = req.body.first_no;
-let num2 = req.body.second_no;
+let email      = req.body.email;
+let first_name = req.body.first_name;
+let last_name  = req.body.last_name;
+let password   = req.body.password;
+let opts       = {};
 
 async.waterfall([
     function(cb){
-        let c= num1 + num2
-        console.log("the addition is...",c);
-        return cb(null,{sum:c});
-
-    }, function(result,cb){
-        let c = num1 * num2;
-        result.multi = c;
-        return cb(null,result);
-
-    } , function(result,cb){
-        let c = num1/num2;
-        result.div = c;
-        return cb(null,result);
+        opts={
+            email : email
+        };
+        db.collection('tb_users').find(opts).toArray(function(err,result){
+            if(err){
+                return cb(err)
+            } else if(result.length){
+                return cb("EMAIL ALREADY EXIST");
+            } else{
+                return cb(null);
+            }
+        })    
+    }, function(cb){
+        opts ={
+            first_name : first_name,
+            last_name  : last_name,
+            email      : email,
+            password   : password
+        };
+        db.collection('tb_users').insertOne(opts,function(err,result){
+            if(err){
+                return cb(err);
+            } else {
+                return cb(null);
+            }
+        });
+    } , function(cb){
+        opts ={
+            email : email
+        };
+        db.collection('tb_users').find(opts).toArray(function(err,result){
+            if(err){
+                return cb(err)
+            } 
+            delete result[0].password;
+            return cb(null,result[0]);
+        })        
     }
 ],function(err,result){
     if(err) {
-        return res.status(400).send(err);
+        return res.status(200).send({status:400,message:"SOMETHING WENT WRONG",data:err});
     } else {
-        return res.status(200).send(result);
+        return res.status(200).send({message :"Inserted Successfully",data:result});
     }
 })
 }
 
 function autoMaodel(req,res){
-    console.log("tyhe body is.....",req.body);
-    let num1 = req.body.first_no;
-    let num2 = req.body.second_no;
-
+    let email      = req.body.email;
+    let first_name = req.body.first_name;
+    let last_name  = req.body._last_name;
+    let password   = req.body.password;
+    let opts       = {};
+    
     async.auto({
-        addition : function(cb) {
-            return cb(null,(num1+num2))
-        } ,
-        multi : function(cb){
-            return cb(null,(num1*num2));
-        },
-        div : ['addition','multi',function(result,cb){            
-            let c = Number((num1/num2).toFixed(4));            
-             return cb(null,c);
+        checkEmail : function(cb){
+            opts ={
+                email : email
+            }
+            db.collection('tb_users').find(opts).toArray(function(err,result){
+                if(err){
+                    return cb(err);
+                }
+                else if(result.length){
+                    return cb("EMAIL ALREADY EXIST");
+                } else {
+                    return cb(null);
+                }
+            });
+        }, 
+        insertUser :['checkEmail',function(user,cb){
+            opts ={
+                first_name : first_name,
+                last_name  : last_name,
+                email      : email,
+                password   : password
+            };
+            db.collection('tb_users').insertOne(opts,function(err,result){
+                if(err){
+                    return cb(err)
+                } else{
+                    return cb(null);
+                }
+            });
+        }],
+        getUsers : ['insertUser',function(user,cb){
+            opts ={
+                email : email
+            };
+            db.collection('tb_users').find(opts).toArray(function(err,result){
+                if(err){
+                    return cb(err)
+                } 
+                delete result[0].password;
+                return cb(null,result[0]);
+            })
         }] 
     },function(err,result){
         if(err){
-            return res.status(400).send(JSON.stringify(err));
+            return res.status(400).send({stats:400,message:"error",data:err});
         } else {            
-            return res.status(200).send(result);
+            return res.status(200).send({message:"INSERTED SUCCESSFULLY",data:result.getUsers});
         } 
     })
 }
 
 function promiseModel(req, res){
-    let num1   = req.body.first_no;
-    let num2   = req.body.second_no;
-    let result = {};
+    let email      = req.body.email;
+    let first_name = req.body.first_name;
+    let last_name  = req.body._last_name;
+    let password   = req.body.password;
+    let opts       = {};
 
     Promise.coroutine(function*(){
-        
-        let add = yield services.add(num1,num2);
-        
-        let mul = yield services.mult(num1,num2);
+        opts={
+            email: email
+        }
+        let checkEmail = yield services.getUserDetails(opts);
 
-        let div = yield services.div(num1,num2);
-        
-        result = {
-            sum      : add,
-            multiply : mul,
-            div      : div
+        if(checkEmail.length){
+            return ({
+                status  : 201,
+                message : 'EMAIL ALREADY EXIST',
+                data    : []
+            });
         };
+
+        opts = {
+            first_name : first_name,
+            last_name  : last_name,
+            password   : password,
+            email      : email
+        }
+        
+        yield services.insertUser(opts);
+
+        opts = {
+            email    : email,
+            password : password
+        };
+
+        let getUsers = yield services.getUserDetails(opts);
+
+        delete getUsers[0].password;
+        delete req.body.password;
+
+        return ({
+            status : 200,
+            message: "INSERTED SUCCESSFULLY",
+            data   : getUsers[0]
+        });
 
         return result;
     })().then((result)=>{
-        return res.status(200).send({status:200,mesaage:"successful",data:result})
+        return res.status(200).send({status:result.status,mesaage:result.message,data:result.data})
     },(error)=>{
-        return res.status(400).send({sttaus:400,message:"error",data:error});
+        return res.status(400).send({status:400,message:"error",data:error});
     })
 }
 
 async function asyncModel(req,res){
-    let num1   = req.body.first_no;
-    let num2   = req.body.second_no;
-    let result = {};
+    let email      = req.body.email;
+    let first_name = req.body.first_name;
+    let last_name  = req.body._last_name;
+    let password   = req.body.password;
+    let opts       = {};
 
     try{
-        let add = await services.add(num1,num2);
+        opts={
+            email: email
+        }
+        let checkEmail = await services.getUserDetails(opts);
         
-        let mul = await services.mult(num1,num2);
-
-        let div = await services.div(num1,num2);
-
-        result = {
-            sum      : add,
-            multiply : mul,
-            div      : div
+        if(checkEmail.length){
+           return res.status(200).send({status:200,mesaage:"EMAIL ALREADY EXIST",data:[]});
         };
-        return res.status(200).send({status:200,mesaage:"successful",data:result});
+
+        opts = {
+            first_name : first_name,
+            last_name  : last_name,
+            password   : password,
+            email      : email
+        }
+        
+        await services.insertUser(opts);
+
+        opts = {
+            email    : email,
+            password : password
+        };
+
+        let getUsers = await services.getUserDetails(opts);
+
+        delete getUsers[0].password;
+        delete req.body.password;
+
+        
+        return res.status(200).send({status:200,mesaage:"successful",data:getUsers[0]});
 
     } catch(e){
         return res.status(400).send({sttaus:400,message:"error",data:e});
@@ -119,6 +227,7 @@ async function asyncModel(req,res){
 }
 
 function promisfyModel(req,res){
+    let readFile = Promise.promisify(require("fs").readFile);
     console.log("the promisify model");
 
     readFile('read.txt',"utf-8").then((contents)=>{
@@ -132,29 +241,20 @@ function promisfyModel(req,res){
 function eventModel(req,res){
  const e = new eventEmitter();
  
- console.log("start");
-
- setImmediate(()=>{
-     console.log("setImmediate: the setImmediate Function running");
- });
-
- e.on('event-1',()=>{
-     console.log(1);
-   });
-
-  e.on('event-2',()=>{
-    console.log(2);
-   });
-
-  e.on('event-3',()=>{
-    console.log(3);
- });
-
- e.emit('event-1');
- e.emit('event-2');
- e.emit('event-3');
-
- console.log('end');
+ fs.readFile('./read.txt',(result)=>{
+     //In I/O operation the setImmediate fuction call first the callback
+     setTimeout(()=>{
+         concate("hellow","How r U","setTimeOut");
+     },0);
+     setImmediate(()=>{
+        concate("hellow","How r U","setImmediate");
+     })
+ })
+ 
 
  return res.status(200).send({status:200,message:"successful",data:{}});
+}
+
+function  concate(str,str2,method){
+    console.log(str + ""+ str2 + ".Calling from "+method);
 }
