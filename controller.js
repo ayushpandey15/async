@@ -183,6 +183,7 @@ function promiseModel(req, res){
 }
 
 async function asyncModel(req,res){
+    console.log("the body is",req.body);
     let email      = req.body.email;
     let first_name = req.body.first_name;
     let last_name  = req.body._last_name;
